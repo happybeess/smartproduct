@@ -1,0 +1,9 @@
+python-dotenv>=1.0.0
+flask>=2.0.0
+websocket
+pytrends
+pandas
+playwright
+flask
+playwright_stealth
+#playwright install
