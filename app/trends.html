@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关键词趋势 - SmartSeller</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        /* ===== Header ===== */
+        .header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f2557 100%);
+            color: white;
+            padding: 0 32px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+        .header-title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
+        .header-nav { display: flex; gap: 4px; }
+        .nav-btn {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background: transparent;
+            color: rgba(255,255,255,0.75);
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-btn.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .nav-btn.accent {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            color: white;
+        }
+        .nav-btn.accent:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* ===== Main Layout ===== */
+        .main-container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+        /* ===== Search Panel ===== */
+        .search-panel {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .search-panel h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .search-panel h2 .icon { font-size: 1.2rem; }
+
+        .search-form {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.78rem; color: #64748b; font-weight: 500; }
+        .form-group input, .form-group select {
+            padding: 10px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            background: #f8fafc;
+            color: #1e293b;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 120px;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: #0ea5e9; }
+        .form-group input::placeholder { color: #94a3b8; }
+
+        .kw-input-wrap { flex: 1; position: relative; }
+        .kw-input-wrap input { width: 100%; min-width: 280px; }
+        .kw-tags {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
+        }
+        .kw-tag {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: default;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(14,165,233,0.4); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn-green {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        .btn-green:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(16,185,129,0.4); }
+
+        .quick-kws {
+            display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+        }
+        .quick-kw {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-kw:hover { background: #e0f2fe; border-color: #0ea5e9; color: #0284c7; }
+
+        /* ===== Stats Cards ===== */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .stat-card.blue::before { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+        .stat-card.purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+        .stat-card.green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .stat-card.orange::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .stat-card .kw-label { font-size: 0.8rem; color: #64748b; margin-bottom: 4px; }
+        .stat-card .kw-name { font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 8px; }
+        .stat-card .stat-value { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+        .stat-card .stat-sub {
+            font-size: 0.78rem; color: #64748b; margin-top: 4px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .trend-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+        }
+        .trend-up { background: #dcfce7; color: #16a34a; }
+        .trend-down { background: #fee2e2; color: #dc2626; }
+        .trend-stable { background: #f1f5f9; color: #64748b; }
+
+        /* ===== Chart Section ===== */
+        .chart-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .section-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+        }
+        .section-header h3 { font-size: 1rem; font-weight: 600; color: #334155; }
+        .chart-actions { display: flex; gap: 8px; }
+        .chart-wrap { position: relative; height: 380px; }
+        .chart-empty {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 380px; color: #94a3b8; gap: 12px;
+        }
+        .chart-empty .icon { font-size: 3rem; opacity: 0.4; }
+        .chart-empty p { font-size: 0.9rem; }
+
+        /* ===== Related Queries ===== */
+        .related-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .related-list {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;
+        }
+        .related-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+        .related-item:hover { background: #f0f9ff; border-color: #0ea5e9; }
+        .related-query { font-size: 0.85rem; color: #334155; font-weight: 500; }
+        .related-value { font-size: 0.8rem; color: #64748b; font-weight: 600; }
+
+        /* ===== Data Table ===== */
+        .table-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        thead th {
+            padding: 10px 14px;
+            text-align: left;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.15s; }
+        tbody tr:hover { background: #f8fafc; }
+        tbody td { padding: 10px 14px; color: #334155; }
+        .date-cell { color: #64748b; font-size: 0.8rem; white-space: nowrap; }
+        .val-cell { font-weight: 600; font-family: 'SF Mono', 'Consolas', monospace; }
+
+        /* ===== Loading / Error ===== */
+        .loading-mask {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.85);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 999; gap: 16px;
+        }
+        .spinner {
+            width: 44px; height: 44px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #0ea5e9;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-mask p { color: #475569; font-size: 0.9rem; }
+
+        .error-msg {
+            padding: 12px 16px;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            color: #dc2626;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+        .info-msg {
+            padding: 10px 16px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            color: #0284c7;
+            font-size: 0.82rem;
+            margin-bottom: 16px;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .search-form { grid-template-columns: 1fr; }
+            .header-nav { display: none; }
+            .chart-wrap { height: 280px; }
+        }
+
+        /* ===== Tooltip ===== */
+        .tooltip { position: relative; }
+        .tooltip-text {
+            visibility: hidden; opacity: 0;
+            position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: white;
+            padding: 4px 10px; border-radius: 6px; font-size: 0.75rem;
+            white-space: nowrap; z-index: 10;
+            transition: opacity 0.2s;
+        }
+        .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+    </style>
+</head>
+<body>
+
+<!-- Loading Mask -->
+<div id="loadingMask" class="loading-mask" style="display:none">
+    <div class="spinner"></div>
+    <p id="loadingText">正在查询 Google Trends...</p>
+</div>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-left">
+        <div class="header-logo">📊</div>
+        <span class="header-title">关键词趋势分析</span>
+    </div>
+    <nav class="header-nav">
+        <a href="selection_system.html" class="nav-btn">选品系统</a>
+        <a href="trends.html" class="nav-btn accent active">关键词趋势</a>
+    </nav>
+</div>
+
+<div class="main-container">
+
+    <!-- Error / Info -->
+    <div id="errorBox" class="error-msg" style="display:none"></div>
+    <div id="infoBox" class="info-msg" style="display:none"></div>
+
+    <!-- Search Panel -->
+    <div class="search-panel">
+        <h2><span class="icon">🔍</span> 关键词趋势对比</h2>
+        <div class="search-form">
+            <div class="kw-input-wrap form-group">
+                <label>关键词（多个用逗号分隔，最多5个）</label>
+                <input type="text" id="keywordsInput" placeholder="例如: bluetooth speaker, wireless earbuds, portable speaker" value="">
+                <div class="kw-tags" id="kwTags"></div>
+                <div class="quick-kws">
+                    <span style="font-size:0.78rem;color:#94a3b8;align-self:center;">快速:</span>
+                    <button class="quick-kw" onclick="setKeywords('bluetooth speaker, wireless earbuds')">蓝牙音箱</button>
+                    <button class="quick-kw" onclick="setKeywords('iphone case, samsung case, phone case')">手机壳</button>
+                    <button class="quick-kw" onclick="setKeywords('yoga mat, resistance bands, dumbbells')">健身用品</button>
+                    <button class="quick-kw" onclick="setKeywords('led strip, desk lamp, ring light')">家居灯饰</button>
+                    <button class="quick-kw" onclick="setKeywords('toys, kids gift, educational toy')">儿童玩具</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>国家/地区</label>
+                <select id="geoSelect">
+                    <option value="US">🇺🇸 美国</option>
+                    <option value="GB">🇬🇧 英国</option>
+                    <option value="DE">🇩🇪 德国</option>
+                    <option value="FR">🇫🇷 法国</option>
+                    <option value="JP">🇯🇵 日本</option>
+                    <option value="CA">🇨🇦 加拿大</option>
+                    <option value="AU">🇦🇺 澳大利亚</option>
+                    <option value="IN">🇮🇳 印度</option>
+                    <option value="BR">🇧🇷 巴西</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>时间范围</label>
+                <select id="timeSelect">
+                    <option value="today 1-m">近1个月</option>
+                    <option value="today 3-m" selected>近3个月</option>
+                    <option value="today 12-m">近12个月</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="searchBtn" onclick="doSearch()">
+                <span>🚀</span> 查询趋势
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-row" id="statsRow">
+        <div class="stat-card blue">
+            <div class="kw-label">关键词数量</div>
+            <div class="stat-value" id="statCount">-</div>
+        </div>
+        <div class="stat-card purple">
+            <div class="kw-label">数据点数量</div>
+            <div class="stat-value" id="statPoints">-</div>
+        </div>
+        <div class="stat-card green">
+            <div class="kw-label">相关查询数量</div>
+            <div class="stat-value" id="statRelated">-</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="kw-label">查询国家</div>
+            <div class="stat-value" id="statGeo">-</div>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-section">
+        <div class="section-header">
+            <h3>📈 趋势曲线对比</h3>
+            <div class="chart-actions">
+                <button class="btn btn-secondary" onclick="exportChart()" style="padding:6px 14px;font-size:0.8rem;">📥 导出图表</button>
+            </div>
+        </div>
+        <div class="chart-wrap" id="chartWrap">
+            <div class="chart-empty" id="chartEmpty">
+                <div class="icon">📊</div>
+                <p>输入关键词并点击「查询趋势」查看趋势图</p>
+            </div>
+            <canvas id="trendChart" style="display:none"></canvas>
+        </div>
+    </div>
+
+    <!-- Related Queries -->
+    <div class="related-section" id="relatedSection" style="display:none">
+        <div class="section-header">
+            <h3>🔗 相关查询（Related Queries）</h3>
+        </div>
+        <div class="related-list" id="relatedList"></div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-section" id="tableSection" style="display:none">
+        <div class="section-header">
+            <h3>📋 原始数据</h3>
+            <div class="chart-actions">
+                <button class="btn btn-secondary" onclick="exportExcel()" style="padding:6px 14px;font-size:0.8rem;">📊 导出Excel</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ===== State =====
+    let currentData = null;
+    let trendChart = null;
+    const CHART_COLORS = [
+        '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b',
+        '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
+    ];
+
+    // ===== Utils =====
+    function showLoading(text = '正在查询...') {
+        document.getElementById('loadingText').textContent = text;
+        document.getElementById('loadingMask').style.display = 'flex';
+    }
+    function hideLoading() {
+        document.getElementById('loadingMask').style.display = 'none';
+    }
+    function showError(msg) {
+        const el = document.getElementById('errorBox');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 8000);
+    }
+    function showInfo(msg) {
+        const el = document.getElementById('infoBox');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    function setKeywords(kws) {
+        document.getElementById('keywordsInput').value = kws;
+    }
+
+    // ===== Search =====
+    async function doSearch() {
+        const keywords = document.getElementById('keywordsInput').value.trim();
+        const geo = document.getElementById('geoSelect').value;
+        const timeframe = document.getElementById('timeSelect').value;
+
+        if (!keywords) {
+            showError('请输入至少一个关键词');
+            return;
+        }
+
+        showLoading('正在查询 Google Trends...');
+        document.getElementById('errorBox').style.display = 'none';
+
+        try {
+            const params = new URLSearchParams({
+                keywords: keywords,
+                geo: geo,
+                timeframe: timeframe,
+            });
+            const resp = await fetch(`/api/keyword-trend?${params}`);
+            const json = await resp.json();
+
+            if (!resp.ok || json.error) {
+                showError(json.error || '请求失败');
+                hideLoading();
+                return;
+            }
+
+            currentData = json;
+            renderAll();
+            hideLoading();
+
+        } catch (e) {
+            showError('网络错误: ' + e.message);
+            hideLoading();
+        }
+    }
+
+    // ===== Render =====
+    function renderAll() {
+        if (!currentData) return;
+        renderStats();
+        renderChart();
+        renderRelated();
+        renderTable();
+    }
+
+    function renderStats() {
+        const d = currentData;
+        document.getElementById('statCount').textContent = d.keywords.length;
+        document.getElementById('statPoints').textContent = d.timeline.length;
+        document.getElementById('statRelated').textContent = d.related_queries.length;
+
+        const geoNames = {
+            US: '🇺🇸 美国', GB: '🇬🇧 英国', DE: '🇩🇪 德国',
+            FR: '🇫🇷 法国', JP: '🇯🇵 日本', CA: '🇨🇦 加拿大',
+            AU: '🇦🇺 澳大利亚', IN: '🇮🇳 印度', BR: '🇧🇷 巴西',
+        };
+        document.getElementById('statGeo').textContent = geoNames[d.geo] || d.geo;
+    }
+
+    function renderChart() {
+        const d = currentData;
+        if (!d.timeline || d.timeline.length === 0) return;
+
+        document.getElementById('chartEmpty').style.display = 'none';
+        document.getElementById('trendChart').style.display = 'block';
+
+        const ctx = document.getElementById('trendChart').getContext('2d');
+
+        if (trendChart) trendChart.destroy();
+
+        const labels = d.timeline.map(p => formatDate(p.date));
+
+        const datasets = d.keywords.map((kw, i) => {
+            const color = CHART_COLORS[i % CHART_COLORS.length];
+            return {
+                label: kw,
+                data: d.timeline.map(p => p[kw] || 0),
+                borderColor: color,
+                backgroundColor: color + '22',
+                borderWidth: 2,
+                pointRadius: d.timeline.length > 90 ? 0 : 3,
+                pointHoverRadius: 5,
+                tension: 0.3,
+                fill: false,
+            };
+        });
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { usePointStyle: true, padding: 20, font: { size: 13 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => items[0].label,
+                            label: (item) => ` ${item.dataset.label}: ${item.raw}`,
+                        }
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { maxTicksLimit: 12, font: { size: 11 }, color: '#94a3b8' },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' },
+                        ticks: { font: { size: 11 }, color: '#94a3b8' },
+                        title: { display: true, text: '搜索热度 (0-100)', font: { size: 11 }, color: '#94a3b8' },
+                    },
+                },
+            },
+        });
+    }
+
+    function formatDate(val) {
+        if (!val && val !== 0) return '-';
+        // 如果是数字（时间戳），转换为日期
+        if (typeof val === 'number' || !isNaN(Number(val))) {
+            try {
+                const d = new Date(Number(val) * 1000);
+                if (!isNaN(d.getTime())) {
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                }
+            } catch {}
+        }
+        // 如果是字符串（API返回的格式如 "Feb 22, 2026"），直接返回
+        if (typeof val === 'string' && val.trim()) {
+            return val;
+        }
+        return String(val);
+    }
+
+    function renderRelated() {
+        const d = currentData;
+        const section = document.getElementById('relatedSection');
+        const list = document.getElementById('relatedList');
+
+        if (!d.related_queries || d.related_queries.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        list.innerHTML = d.related_queries.map(rq => `
+            <div class="related-item" onclick="searchRelated('${rq.query.replace(/'/g, "\\'")}')" style="cursor:pointer">
+                <span class="related-query">${rq.query}</span>
+                <span class="related-value">${rq.value || '-'}</span>
+            </div>
+        `).join('');
+    }
+
+    function searchRelated(query) {
+        document.getElementById('keywordsInput').value = query;
+        doSearch();
+    }
+
+    function renderTable() {
+        const d = currentData;
+        const section = document.getElementById('tableSection');
+        const thead = document.getElementById('tableHead');
+        const tbody = document.getElementById('tableBody');
+
+        if (!d.timeline || d.timeline.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+
+        // Header
+        thead.innerHTML = `<tr>
+            <th>日期</th>${d.keywords.map((kw, i) =>
+                `<th><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CHART_COLORS[i % CHART_COLORS.length]};margin-right:6px"></span>${kw}</th>`
+            ).join('')}
+        </tr>`;
+
+        // Body
+        tbody.innerHTML = d.timeline.map(row => `
+            <tr>
+                <td class="date-cell">${formatDate(row.date)}</td>
+                ${d.keywords.map(kw => `<td class="val-cell">${row[kw] || 0}</td>`).join('')}
+            </tr>
+        `).join('');
+    }
+
+    // ===== Export =====
+    function exportExcel() {
+        if (!currentData || !currentData.timeline || currentData.timeline.length === 0) {
+            showInfo('没有数据可导出');
+            return;
+        }
+        const d = currentData;
+        const wsData = [
+            ['日期', ...d.keywords],
+            ...d.timeline.map(row => [formatDate(row.date), ...d.keywords.map(kw => row[kw] || 0)]),
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '关键词趋势');
+        XLSX.writeFile(wb, `keyword_trend_${d.geo}_${Date.now()}.xlsx`);
+    }
+
+    function exportChart() {
+        if (!trendChart) { showInfo('请先查询数据'); return; }
+        const link = document.createElement('a');
+        link.download = `trend_chart_${Date.now()}.png`;
+        link.href = trendChart.toBase64Image();
+        link.click();
+    }
+
+    // ===== Keyboard shortcut =====
+    document.getElementById('keywordsInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doSearch();
+    });
+</script>
+</body>
+</html>
